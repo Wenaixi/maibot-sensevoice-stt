@@ -1,0 +1,8 @@
+[plugin]
+enabled = true
+config_version = "0.2.0"
+
+[stt]
+endpoint_url = "http://sensevoice:50000/v1/audio/transcriptions"
+timeout_seconds = 30
+language = "auto"
