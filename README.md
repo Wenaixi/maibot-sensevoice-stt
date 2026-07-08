@@ -1,6 +1,6 @@
-# SenseVoice STT — 语音转文字插件
+# maibot-sensevoice-stt
 
-通过本地 SenseVoice Docker sidecar 将 QQ 语音消息自动转录为文字，纯本地方案，不依赖任何第三方云 API。
+麦麦（MaiBot）SenseVoice 语音识别 STT 插件
 
 ## 插件信息
 
