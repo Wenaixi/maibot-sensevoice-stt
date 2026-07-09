@@ -42,7 +42,15 @@ _mock_aiohttp = MagicMock()
 _mock_aiohttp.ClientTimeout = lambda total: total
 _mock_aiohttp.ClientConnectorError = type("ClientConnectorError", (Exception,), {})
 _mock_aiohttp.FormData = MagicMock
-sys.modules["aiohttp"] = _mock_aiohttp
+
+
+def _install_plugin_mocks():
+    sys.modules["maibot_sdk"] = _mock_sdk
+    sys.modules["maibot_sdk.types"] = _mock_types
+    sys.modules["aiohttp"] = _mock_aiohttp
+
+
+_install_plugin_mocks()
 
 # ---- 被测模块（用 package 加载以支持 plugin.py 的相对导入）----
 
@@ -71,6 +79,11 @@ sys.modules["_stt_pkg.plugin"] = pmod
 _spec.loader.exec_module(pmod)
 
 
+def _reload_plugin_module():
+    _install_plugin_mocks()
+    importlib.reload(pmod)
+
+
 def _fake_transcribe_result(success=True, text="hello", error_type=None, attempt=1):
     from _stt_pkg.core.stt_client import TranscriptionResult
     if success:
@@ -80,7 +93,7 @@ def _fake_transcribe_result(success=True, text="hello", error_type=None, attempt
 
 class TestRebuildPlainText(unittest.TestCase):
     def setUp(self):
-        importlib.reload(pmod)
+        _reload_plugin_module()
 
     def test_all_types(self):
         segs = [
@@ -124,7 +137,7 @@ class TestCreatePlugin(unittest.TestCase):
 
 class TestLifecycle(unittest.TestCase):
     def setUp(self):
-        importlib.reload(pmod)
+        _reload_plugin_module()
         self.p = pmod.SenseVoiceSttPlugin()
         self.p.config.plugin.enabled = True
         self.p.config.stt.endpoint_url = "http://sensevoice:50000/v1/audio/transcriptions"
@@ -147,18 +160,18 @@ class TestLifecycle(unittest.TestCase):
 
     def test_on_config_update_self_scope(self):
         self.p._client = None
-        asyncio.run(self.p.on_config_update("self", {}, "0.2.0"))
+        asyncio.run(self.p.on_config_update("self", {}, "0.3.0"))
         self.assertIsNotNone(self.p._client)
 
     def test_on_config_update_ignored_scope(self):
         self.p._client = None
-        asyncio.run(self.p.on_config_update("bot", {}, "0.2.0"))
+        asyncio.run(self.p.on_config_update("bot", {}, "0.3.0"))
         self.assertIsNone(self.p._client)
 
 
 class TestTranscribeHook(unittest.TestCase):
     def setUp(self):
-        importlib.reload(pmod)
+        _reload_plugin_module()
         self.p = pmod.SenseVoiceSttPlugin()
         self.p.config.plugin.enabled = True
         self.p.config.stt.endpoint_url = "http://sensevoice:50000/v1/audio/transcriptions"
@@ -285,37 +298,61 @@ class TestTranscribeHook(unittest.TestCase):
 
 class TestHomeCard(unittest.TestCase):
     def test_returns_blocks(self):
-        importlib.reload(pmod)
+        _reload_plugin_module()
+        from _stt_pkg.core.stt_client import HealthCheckResult
+
         p = pmod.SenseVoiceSttPlugin()
         p.config.plugin.enabled = True
         p.config.stt.endpoint_url = "http://localhost:50000"
         asyncio.run(p.on_load())
+        p._client.check_health = AsyncMock(return_value=HealthCheckResult.ready())
 
         card = asyncio.run(p.stt_home_card())
         self.assertIn("blocks", card)
         self.assertIsInstance(card["blocks"], list)
         self.assertTrue(len(card["blocks"]) > 0)
+        entries = card["blocks"][0]["entries"]
+        self.assertEqual(entries["插件状态"], "启用")
+        self.assertEqual(entries["后端健康"], "ready")
+        self.assertEqual(entries["Endpoint"], "http://localhost:50000")
 
     def test_home_card_disabled(self):
-        importlib.reload(pmod)
+        _reload_plugin_module()
         p = pmod.SenseVoiceSttPlugin()
         p.config.plugin.enabled = False
+        p.config.stt.endpoint_url = "http://localhost:50000"
         p._client = None
 
         card = asyncio.run(p.stt_home_card())
-        items = card["blocks"][0]["items"]
-        status_item = next(i for i in items if i["key"] == "状态")
-        self.assertEqual(status_item["value"], "已禁用")
+        entries = card["blocks"][0]["entries"]
+        self.assertEqual(entries["插件状态"], "已禁用")
+        self.assertEqual(entries["后端健康"], "未启用")
+
+    def test_home_card_sidecar_unreachable(self):
+        _reload_plugin_module()
+        from _stt_pkg.core.stt_client import HealthCheckResult
+
+        p = pmod.SenseVoiceSttPlugin()
+        p.config.plugin.enabled = True
+        p.config.stt.endpoint_url = "http://localhost:50000/v1/audio/transcriptions"
+        asyncio.run(p.on_load())
+        p._client.check_health = AsyncMock(
+            return_value=HealthCheckResult.fail("connection")
+        )
+
+        card = asyncio.run(p.stt_home_card())
+        entries = card["blocks"][0]["entries"]
+        self.assertEqual(entries["后端健康"], "unreachable/connection")
 
 
 class TestStatsTracking(unittest.TestCase):
     def setUp(self):
-        importlib.reload(pmod)
+        _reload_plugin_module()
         self.p = pmod.SenseVoiceSttPlugin()
 
     def test_reset_on_load(self):
         self.p._stats = {"total_requests": 999}
-        with patch("_stt_pkg.core.stt_client.SenseVoiceClient"):
+        with patch("_stt_pkg.plugin.SenseVoiceClient"):
             asyncio.run(self.p.on_load())
         self.assertEqual(self.p._stats["total_requests"], 0)
 

@@ -1,9 +1,9 @@
 {
   "manifest_version": 2,
   "id": "dmjxmj.sensevoice-stt",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "name": "SenseVoice STT 语音转文字",
-  "description": "通过本地 SenseVoice Docker sidecar 将 QQ 语音消息识别为文字",
+  "description": "通过本地或远程 SenseVoice sidecar 将 QQ 语音消息识别为文字",
   "author": {
     "name": "GPT-5.5, Deepseek-V4",
     "url": "https://github.com/DMJXMJ"
@@ -18,8 +18,14 @@
   "host_application": { "min_version": "1.0.0", "max_version": "1.99.99" },
   "sdk": { "min_version": "2.0.0", "max_version": "2.99.99" },
   "capabilities": [],
-  "plugin_type": "tool",
-  "dependencies": [],
+  "plugin_type": "media",
+  "dependencies": [
+    {
+      "type": "python_package",
+      "name": "aiohttp",
+      "version_spec": ">=3.9.0"
+    }
+  ],
   "i18n": {
     "default_locale": "zh-CN",
     "supported_locales": ["zh-CN"]

@@ -59,12 +59,13 @@ class TestSenseVoiceClient(unittest.TestCase):
             **kw,
         )
 
-    def _make_mock_session(self, post_return):
+    def _make_mock_session(self, post_return=None, get_return=None):
         """构造一个支持 async with 的 mock ClientSession。"""
         sess = MagicMock()
         sess.__aenter__ = AsyncMock(return_value=sess)
         sess.__aexit__ = AsyncMock(return_value=False)
         sess.post = MagicMock(return_value=post_return)
+        sess.get = MagicMock(return_value=get_return)
         return sess
 
     def _make_resp_ctx(self, status, json_data=None):
@@ -88,6 +89,62 @@ class TestSenseVoiceClient(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.text, "你好世界")
         self.assertEqual(result.attempt, 1)
+
+    def test_build_health_url_from_transcription_endpoint(self):
+        self.assertEqual(
+            stt_module.build_health_url(
+                "http://localhost:50000/v1/audio/transcriptions"
+            ),
+            "http://localhost:50000/health",
+        )
+
+    def test_build_health_url_from_nested_endpoint(self):
+        self.assertEqual(
+            stt_module.build_health_url(
+                "http://localhost:50000/api/v1/audio/transcriptions"
+            ),
+            "http://localhost:50000/api/health",
+        )
+
+    def test_check_health_ready(self):
+        client = self._client()
+        ctx = self._make_resp_ctx(200, {"status": "ready"})
+        sess = self._make_mock_session(get_return=ctx)
+
+        with patch("core.stt_client.aiohttp.ClientSession", return_value=sess):
+            result = asyncio.run(client.check_health())
+
+        self.assertTrue(result.ok)
+        self.assertEqual(result.status, "ready")
+        self.assertIsNone(result.error_type)
+
+    def test_check_health_loading(self):
+        client = self._client()
+        ctx = self._make_resp_ctx(200, {"status": "loading"})
+        sess = self._make_mock_session(get_return=ctx)
+
+        with patch("core.stt_client.aiohttp.ClientSession", return_value=sess):
+            result = asyncio.run(client.check_health())
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.status, "loading")
+        self.assertEqual(result.error_type, "not_ready")
+
+    def test_check_health_connection_error(self):
+        client = self._client()
+        sess = self._make_mock_session()
+        sess.get = MagicMock(
+            side_effect=stt_module.aiohttp.ClientConnectorError(
+                "mock", OSError("refused")
+            )
+        )
+
+        with patch("core.stt_client.aiohttp.ClientSession", return_value=sess):
+            result = asyncio.run(client.check_health())
+
+        self.assertFalse(result.ok)
+        self.assertEqual(result.status, "unreachable")
+        self.assertEqual(result.error_type, "connection")
 
     def test_http_500_no_retry(self):
         client = self._client()

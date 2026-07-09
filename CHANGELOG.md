@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0] — 2026-07-09
+
+### 插件市场安装体验
+
+- Manifest 版本升级至 `0.3.0`，插件类型改为 `media`
+- Manifest 只声明插件本体依赖 `aiohttp>=3.9.0`，不把 `torch`、`funasr`、`modelscope` 等 sidecar 推理依赖安装进 MaiBot 主环境
+- 描述从 Docker-only 语义调整为本地或远程 SenseVoice sidecar
+
+### WebUI 配置与自诊断
+
+- 配置模型增加 WebUI 分组标题、图标、排序和 endpoint placeholder
+- HomeCard 增加 endpoint、后端健康、最近错误类型等诊断信息
+- 新增 sidecar `/health` 轻量探测；sidecar 不可达时不阻塞插件加载或消息流
+
+### 非 Docker 纯 Python 部署文档
+
+- README 增加插件市场安装、源码安装、一键包安装、Docker/Compose 四种路径，非 Docker 路径优先指向纯 Python 部署
+- sidecar README 将纯 Python 手动运行前置，补充依赖清单、启动命令、健康检查和常见问题
+- 明确 Docker sidecar 仅面向 Docker/Compose 用户或明确希望容器化 sidecar 的场景
+- 情绪/事件/语言富元数据转录延后到后续版本
+
 ## [0.2.0] — 2026-07-08
 
 ### 插件封装正式化

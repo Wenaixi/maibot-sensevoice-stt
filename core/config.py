@@ -6,20 +6,50 @@ from maibot_sdk import Field, PluginConfigBase
 class PluginSection(PluginConfigBase):
     """插件基础配置，对应 config.toml 的 [plugin] 节。"""
 
-    enabled: bool = Field(default=True, description="是否启用语音转文字")
-    config_version: str = Field(default="0.2.0", description="配置版本")
+    __ui_label__ = "插件设置"
+    __ui_icon__ = "settings"
+    __ui_order__ = 0
+
+    enabled: bool = Field(
+        default=True,
+        description="是否启用语音转文字",
+        json_schema_extra={"group": "plugin"},
+    )
+    config_version: str = Field(
+        default="0.3.0",
+        description="配置版本",
+        json_schema_extra={"group": "plugin"},
+    )
 
 
 class SttConfig(PluginConfigBase):
     """STT 后端配置。"""
 
+    __ui_label__ = "SenseVoice 后端"
+    __ui_icon__ = "record_voice_over"
+    __ui_order__ = 10
+
     endpoint_url: str = Field(
         default="http://sensevoice:50000/v1/audio/transcriptions",
-        description="SenseVoice API 地址",
+        description=(
+            "SenseVoice sidecar 转录接口。Docker/Compose 默认使用 "
+            "http://sensevoice:50000/v1/audio/transcriptions；源码或一键包同机部署通常使用 "
+            "http://127.0.0.1:50000/v1/audio/transcriptions"
+        ),
+        json_schema_extra={
+            "placeholder": "http://127.0.0.1:50000/v1/audio/transcriptions",
+            "group": "stt",
+        },
     )
-    timeout_seconds: int = Field(default=30, description="请求超时（秒）")
+    timeout_seconds: int = Field(
+        default=30,
+        description="转录请求超时（秒）",
+        json_schema_extra={"placeholder": "30", "group": "stt"},
+    )
     language: str = Field(
-        default="auto", description="识别语言 (auto/zh/en/yue/ja/ko)"
+        default="auto",
+        description="识别语言 (auto/zh/en/yue/ja/ko)",
+        json_schema_extra={"placeholder": "auto", "group": "stt"},
     )
 
 

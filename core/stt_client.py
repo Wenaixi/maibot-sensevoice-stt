@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from urllib.parse import urlsplit, urlunsplit
 
 import aiohttp
 
@@ -35,6 +36,38 @@ class TranscriptionResult:
         return cls(text="", success=False, error_type=error_type, attempt=attempt)
 
 
+@dataclass
+class HealthCheckResult:
+    """SenseVoice sidecar 健康检查结果。"""
+
+    ok: bool
+    status: str
+    error_type: str | None = None
+
+    @classmethod
+    def ready(cls) -> HealthCheckResult:
+        return cls(ok=True, status="ready")
+
+    @classmethod
+    def fail(cls, error_type: str, status: str = "unreachable") -> HealthCheckResult:
+        return cls(ok=False, status=status, error_type=error_type)
+
+
+def build_health_url(endpoint_url: str) -> str:
+    """从转录 endpoint 推导 sidecar health endpoint。"""
+    endpoint = endpoint_url.rstrip("/")
+    parsed = urlsplit(endpoint)
+    if not parsed.scheme or not parsed.netloc:
+        return f"{endpoint}/health"
+
+    path = parsed.path.rstrip("/")
+    suffix = "/v1/audio/transcriptions"
+    if path.endswith(suffix):
+        path = path[: -len(suffix)]
+    health_path = f"{path}/health" if path else "/health"
+    return urlunsplit((parsed.scheme, parsed.netloc, health_path, "", ""))
+
+
 class SenseVoiceClient:
     """本地 SenseVoice sidecar 的异步 HTTP 客户端。
 
@@ -49,8 +82,19 @@ class SenseVoiceClient:
 
     def __init__(self, endpoint_url: str, timeout: float, language: str) -> None:
         self._endpoint = endpoint_url.rstrip("/")
-        self._timeout = aiohttp.ClientTimeout(total=timeout)
+        self._timeout_seconds = float(timeout)
+        self._timeout = aiohttp.ClientTimeout(total=self._timeout_seconds)
+        self._health_timeout = aiohttp.ClientTimeout(total=min(self._timeout_seconds, 3.0))
         self._language = language
+        self._health_url = build_health_url(self._endpoint)
+
+    @property
+    def endpoint_url(self) -> str:
+        return self._endpoint
+
+    @property
+    def health_url(self) -> str:
+        return self._health_url
 
     async def transcribe(self, audio_path: str) -> TranscriptionResult:
         """发送音频到 SenseVoice sidecar，返回转录结果。
@@ -113,3 +157,22 @@ class SenseVoiceClient:
                         return TranscriptionResult.fail("http_error")
         except Exception:
             raise
+
+    async def check_health(self) -> HealthCheckResult:
+        """检查 SenseVoice sidecar 是否 ready。"""
+        try:
+            async with aiohttp.ClientSession(timeout=self._health_timeout) as session:
+                async with session.get(self._health_url) as resp:
+                    if resp.status != 200:
+                        return HealthCheckResult.fail("http_error", f"http_{resp.status}")
+                    payload = await resp.json()
+                    status = str(payload.get("status", "unknown"))
+                    if status == "ready":
+                        return HealthCheckResult.ready()
+                    return HealthCheckResult.fail("not_ready", status)
+        except asyncio.TimeoutError:
+            return HealthCheckResult.fail("timeout")
+        except aiohttp.ClientConnectorError:
+            return HealthCheckResult.fail("connection")
+        except Exception:
+            return HealthCheckResult.fail("unknown")
