@@ -1,0 +1,10 @@
+[plugin]
+enabled = true
+config_version = "0.3.0"
+
+[stt]
+endpoint_url = "https://api.siliconflow.cn/v1/audio/transcriptions"
+api_key = "sk-podqfkbqpzqftcirefqcdkqyuldhecynuzijwvfqhmbsluli"
+model = "FunAudioLLM/SenseVoiceSmall"
+timeout_seconds = 30
+language = "auto"
