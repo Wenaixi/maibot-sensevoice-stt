@@ -1,5 +1,13 @@
 # dmjxmj sensevoice-stt
 
+## 官方上游与版本溯源
+- 官方仓库（Upstream Repository）：https://github.com/DMJXMJ/maibot-sensevoice-stt
+- 官方作者（Author / Maintainer）：DMJXMJ
+- 功能定位：SenseVoice 语音识别（STT）转文字插件
+- 本地演进定位：基于官方上游最新版本，融入本地生产环境兼容性定制与稳定性加固。
+- 本地专属定制：本地跟踪完整 sidecar 与云端端点，配置 SiliconFlow 高精度转写通道。
+
+
 ## 插件基本信息
 
 - 插件 ID：`dmjxmj.sensevoice-stt`
